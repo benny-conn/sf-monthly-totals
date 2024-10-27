@@ -9,7 +9,6 @@ import { toast } from "sonner"
 
 export default function Home() {
   const [file, setFile] = useState(null)
-
   const [processedFileURL, setProcessedFileURL] = useState(null)
 
   const handleFileChange = e => {
@@ -43,7 +42,7 @@ export default function Home() {
       setProcessedFileURL(result.downloadUrl)
     } catch (error) {
       console.error("Error processing CSV:", error)
-      // Handle error (e.g., show error message to user)
+      toast.error("Error processing CSV, contact benny!")
     }
   }
 
@@ -58,9 +57,9 @@ export default function Home() {
       </div>
       <div className="flex flex-col gap-2 items-start">
         <div className="grid w-full max-w-sm items-center gap-1.5">
-          <Label htmlFor="csvFile">Wordpress Sales CSV File</Label>
+          <Label htmlFor="salesFile">Wordpress Sales CSV File</Label>
           <Input
-            id="csvFile"
+            id="salesFile"
             type="file"
             onChange={handleFileChange}
             accept=".csv"
@@ -73,9 +72,9 @@ export default function Home() {
       </div>
       <div className="flex flex-col gap-2 items-start">
         <div className="grid w-full max-w-sm items-center gap-1.5">
-          <Label htmlFor="csvFile">Distrokid Streaming TSV File</Label>
+          <Label htmlFor="streamingFile">Distrokid Streaming TSV File</Label>
           <Input
-            id="csvFile"
+            id="streamingFile"
             type="file"
             onChange={handleFileChange}
             accept=".tsv"
@@ -87,9 +86,11 @@ export default function Home() {
         </Button>
       </div>
       {processedFileURL && (
-        <a href={processedFileURL} download>
-          <Button size="lg">Download Processed CSV</Button>
-        </a>
+        <Button size="lg" asChild className="max-w-96">
+          <a href={processedFileURL} target="_blank" rel="noopener noreferrer">
+            Download Processed CSV
+          </a>
+        </Button>
       )}
     </div>
   )

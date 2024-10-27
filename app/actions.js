@@ -1,8 +1,24 @@
 "use server"
 
-import { join } from "path"
 import csv from "csv-parser"
 import { createObjectCsvWriter } from "csv-writer"
+import { put } from "@vercel/blob"
+import { writeFile } from "fs/promises"
+import { join } from "path"
+import { tmpdir } from "os"
+import { unlink } from "fs/promises"
+import { readFile } from "fs/promises"
+
+// Helper function to create temporary file
+async function createTempFile(data) {
+  const tempPath = join(tmpdir(), `temp-${Date.now()}.csv`)
+  const csvWriter = createObjectCsvWriter({
+    path: tempPath,
+    header: data.header,
+  })
+  await csvWriter.writeRecords(data.records)
+  return tempPath
+}
 
 export async function processSalesCSV(formData) {
   const file = formData.get("file")
@@ -128,26 +144,34 @@ export async function processSalesCSV(formData) {
   console.log("First 5 rows of output data:")
   console.log(JSON.stringify(outputData.slice(0, 5), null, 2))
 
-  // Use a fixed filename
-  const filename = "monthly-totals.csv"
-  const filepath = join(process.cwd(), "public", filename)
-
-  // Write the processed data to the CSV file
-  const csvWriter = createObjectCsvWriter({
-    path: filepath,
+  // Prepare the CSV data
+  const csvData = {
     header: [
       { id: "Project", title: "Project" },
       { id: "SubProject", title: "Sub Project" },
-      { id: "Label", title: "Label" }, // Added new column to header
+      { id: "Label", title: "Label" },
       ...months.map(month => ({ id: month, title: month })),
     ],
-  })
-  await csvWriter.writeRecords(outputData)
+    records: outputData,
+  }
 
-  console.log(`CSV file written to ${filepath}`)
+  // Create temporary file
+  const tempFilePath = await createTempFile(csvData)
 
-  // Return the URL for the processed file
-  return { downloadUrl: `/${filename}` }
+  // Upload to Vercel Blob
+  const blob = await put(
+    `monthly-totals-${Date.now()}.csv`,
+    await readFile(tempFilePath),
+    { access: "public" }
+  )
+
+  // Clean up temp file
+  await unlink(tempFilePath)
+
+  console.log(`File uploaded to ${blob.url}`)
+
+  // Return the Blob URL
+  return { downloadUrl: blob.url }
 }
 
 export async function processStreamingCSV(formData) {
@@ -237,23 +261,31 @@ export async function processStreamingCSV(formData) {
   console.log("First 5 rows of output data:")
   console.log(JSON.stringify(outputData.slice(0, 5), null, 2))
 
-  // Use a fixed filename
-  const filename = "streaming-monthly-totals.csv"
-  const filepath = join(process.cwd(), "public", filename)
-
-  // Write the processed data to the CSV file
-  const csvWriter = createObjectCsvWriter({
-    path: filepath,
+  // Prepare the CSV data
+  const csvData = {
     header: [
       { id: "Project", title: "Project" },
       { id: "Label", title: "Label" },
       ...months.map(month => ({ id: month, title: month })),
     ],
-  })
-  await csvWriter.writeRecords(outputData)
+    records: outputData,
+  }
 
-  console.log(`CSV file written to ${filepath}`)
+  // Create temporary file
+  const tempFilePath = await createTempFile(csvData)
 
-  // Return the URL for the processed file
-  return { downloadUrl: `/${filename}` }
+  // Upload to Vercel Blob
+  const blob = await put(
+    `streaming-monthly-totals-${Date.now()}.csv`,
+    await readFile(tempFilePath),
+    { access: "public" }
+  )
+
+  // Clean up temp file
+  await unlink(tempFilePath)
+
+  console.log(`File uploaded to ${blob.url}`)
+
+  // Return the Blob URL
+  return { downloadUrl: blob.url }
 }
