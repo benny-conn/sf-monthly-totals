@@ -4,7 +4,7 @@ import { join } from "path"
 import csv from "csv-parser"
 import { createObjectCsvWriter } from "csv-writer"
 
-export async function processCSV(formData) {
+export async function processSalesCSV(formData) {
   const file = formData.get("file")
   const bytes = await file.arrayBuffer()
   const buffer = Buffer.from(bytes)
@@ -97,6 +97,7 @@ export async function processCSV(formData) {
       projectRows.push({
         Project: project,
         SubProject: "",
+        Label: "", // Added new column
         ...Object.fromEntries(months.map(m => [m, ""])),
       })
 
@@ -104,13 +105,15 @@ export async function processCSV(formData) {
         projectRows.push({
           Project: "",
           SubProject: subProject,
+          Label: "", // Added new column
           ...Object.fromEntries(months.map(m => [m, ""])),
         })
 
         fields.forEach(field => {
           projectRows.push({
             Project: "",
-            SubProject: field.charAt(0).toUpperCase() + field.slice(1),
+            SubProject: "",
+            Label: field.charAt(0).toUpperCase() + field.slice(1), // Put field names in new column
             ...Object.fromEntries(
               months.map(m => [m, monthData[m]?.[field] || 0])
             ),
@@ -135,6 +138,115 @@ export async function processCSV(formData) {
     header: [
       { id: "Project", title: "Project" },
       { id: "SubProject", title: "Sub Project" },
+      { id: "Label", title: "Label" }, // Added new column to header
+      ...months.map(month => ({ id: month, title: month })),
+    ],
+  })
+  await csvWriter.writeRecords(outputData)
+
+  console.log(`CSV file written to ${filepath}`)
+
+  // Return the URL for the processed file
+  return { downloadUrl: `/${filename}` }
+}
+
+export async function processStreamingCSV(formData) {
+  const file = formData.get("file")
+  const bytes = await file.arrayBuffer()
+  const buffer = Buffer.from(bytes)
+
+  // Parse the TSV
+  const results = []
+  const parser = csv({ separator: "\t" }) // Set separator to tab for TSV
+  parser.on("data", data => results.push(data))
+  parser.write(buffer)
+  parser.end()
+
+  // Wait for parsing to complete
+  await new Promise(resolve => parser.on("end", resolve))
+
+  console.log(`Total rows parsed: ${results.length}`)
+
+  // Process the data
+  const processedData = {}
+  const fields = ["quantity", "royalties", "earnings"]
+  const fieldIndices = [7, 11, 12]
+
+  results.forEach((row, index) => {
+    const columns = Object.values(row)
+    const month = columns[1] // Already in YYYY-MM format
+    const project = columns[3].trim()
+
+    // Skip empty projects
+    if (!project) {
+      return
+    }
+
+    if (index < 5 || index > results.length - 5) {
+      console.log(`Row ${index + 1}: Month: ${month}, Project: ${project}`)
+    }
+
+    if (!processedData[project]) {
+      processedData[project] = {}
+    }
+    if (!processedData[project][month]) {
+      processedData[project][month] = fields.reduce(
+        (acc, field) => ({ ...acc, [field]: 0 }),
+        {}
+      )
+    }
+
+    // Process each field
+    fields.forEach((field, idx) => {
+      const value =
+        parseFloat(columns[fieldIndices[idx]].replace(",", "").trim()) || 0
+      processedData[project][month][field] += value
+    })
+  })
+
+  // Prepare data for CSV writing
+  const months = [
+    ...new Set(Object.values(processedData).flatMap(Object.keys)),
+  ].sort((a, b) => a.localeCompare(b)) // Simple string comparison works for YYYY-MM format
+
+  console.log("Sorted Months:", months)
+
+  const outputData = Object.entries(processedData).flatMap(
+    ([project, monthData]) => {
+      const projectRows = []
+      projectRows.push({
+        Project: project,
+        Label: "",
+        ...Object.fromEntries(months.map(m => [m, ""])),
+      })
+
+      fields.forEach(field => {
+        projectRows.push({
+          Project: "",
+          Label: field.charAt(0).toUpperCase() + field.slice(1),
+          ...Object.fromEntries(
+            months.map(m => [m, monthData[m]?.[field] || 0])
+          ),
+        })
+      })
+
+      return projectRows
+    }
+  )
+
+  console.log("First 5 rows of output data:")
+  console.log(JSON.stringify(outputData.slice(0, 5), null, 2))
+
+  // Use a fixed filename
+  const filename = "streaming-monthly-totals.csv"
+  const filepath = join(process.cwd(), "public", filename)
+
+  // Write the processed data to the CSV file
+  const csvWriter = createObjectCsvWriter({
+    path: filepath,
+    header: [
+      { id: "Project", title: "Project" },
+      { id: "Label", title: "Label" },
       ...months.map(month => ({ id: month, title: month })),
     ],
   })

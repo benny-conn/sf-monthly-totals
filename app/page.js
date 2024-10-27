@@ -4,26 +4,43 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { processCSV } from "./actions.js"
+import { processSalesCSV, processStreamingCSV } from "./actions.js"
+import { toast } from "sonner"
 
 export default function Home() {
   const [file, setFile] = useState(null)
-  const [processedFileUrl, setProcessedFileUrl] = useState(null)
+
+  const [processedFileURL, setProcessedFileURL] = useState(null)
 
   const handleFileChange = e => {
     setFile(e.target.files[0])
-    setProcessedFileUrl(null)
+    setProcessedFileURL(null)
   }
 
-  const handleUpload = async () => {
+  const handleSalesUpload = async () => {
     if (!file) return
 
     const formData = new FormData()
     formData.append("file", file)
 
     try {
-      const result = await processCSV(formData)
-      setProcessedFileUrl(result.downloadUrl)
+      const result = await processSalesCSV(formData)
+      setProcessedFileURL(result.downloadUrl)
+    } catch (error) {
+      console.error("Error processing CSV:", error)
+      toast.error("Error processing CSV, contact benny!")
+    }
+  }
+
+  const handleStreamingUpload = async () => {
+    if (!file) return
+
+    const formData = new FormData()
+    formData.append("file", file)
+
+    try {
+      const result = await processStreamingCSV(formData)
+      setProcessedFileURL(result.downloadUrl)
     } catch (error) {
       console.error("Error processing CSV:", error)
       // Handle error (e.g., show error message to user)
@@ -41,7 +58,7 @@ export default function Home() {
       </div>
       <div className="flex flex-col gap-2 items-start">
         <div className="grid w-full max-w-sm items-center gap-1.5">
-          <Label htmlFor="csvFile">CSV File</Label>
+          <Label htmlFor="csvFile">Wordpress Sales CSV File</Label>
           <Input
             id="csvFile"
             type="file"
@@ -50,16 +67,30 @@ export default function Home() {
           />
         </div>
 
-        <Button size="lg" onClick={handleUpload}>
+        <Button size="lg" onClick={handleSalesUpload}>
           Upload
         </Button>
-
-        {processedFileUrl && (
-          <a href={processedFileUrl} download>
-            <Button size="lg">Download Processed CSV</Button>
-          </a>
-        )}
       </div>
+      <div className="flex flex-col gap-2 items-start">
+        <div className="grid w-full max-w-sm items-center gap-1.5">
+          <Label htmlFor="csvFile">Distrokid Streaming TSV File</Label>
+          <Input
+            id="csvFile"
+            type="file"
+            onChange={handleFileChange}
+            accept=".tsv"
+          />
+        </div>
+
+        <Button size="lg" onClick={handleStreamingUpload}>
+          Upload
+        </Button>
+      </div>
+      {processedFileURL && (
+        <a href={processedFileURL} download>
+          <Button size="lg">Download Processed CSV</Button>
+        </a>
+      )}
     </div>
   )
 }
