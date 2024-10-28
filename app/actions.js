@@ -3,7 +3,6 @@
 import csv from "csv-parser"
 import { createObjectCsvWriter } from "csv-writer"
 import { put } from "@vercel/blob"
-import { writeFile } from "fs/promises"
 import { join } from "path"
 import { tmpdir } from "os"
 import { unlink } from "fs/promises"
@@ -197,9 +196,12 @@ export async function processSalesCSV(formData) {
 
   // Upload to Vercel Blob
   const blob = await put(
-    `monthly-totals-${Date.now()}.csv`,
+    "monthly-sales-totals.csv",
     await readFile(tempFilePath),
-    { access: "public" }
+    {
+      access: "public",
+      addRandomSuffix: false,
+    }
   )
 
   // Clean up temp file
@@ -313,9 +315,12 @@ export async function processStreamingCSV(formData) {
 
   // Upload to Vercel Blob
   const blob = await put(
-    `streaming-monthly-totals-${Date.now()}.csv`,
+    "streaming-monthly-totals.csv",
     await readFile(tempFilePath),
-    { access: "public" }
+    {
+      access: "public",
+      addRandomSuffix: false,
+    }
   )
 
   // Clean up temp file
