@@ -41,22 +41,41 @@ export async function processSalesCSV(formData) {
   const processedData = {}
   const fields = [
     "subtotal",
-    "discount",
-    "adjustedSubtotal",
-    "tax",
-    "shipping",
+    "subtotalTax",
     "total",
-    "gross",
-    "fee",
-    "net",
+    "totalTax",
+    "shipping",
+    "shippingTax",
+    "feeTotal",
+    "feeTaxTotal",
+    "discount",
+    "refunded",
   ]
-  const fieldIndices = [62, 64, 65, 66, 67, 68, 69, 70, 71] // Updated indices
+
   results.forEach((row, index) => {
     const columns = Object.values(row)
-    const date = new Date(columns[58])
+
+    // Skip non-completed orders
+    if (columns[3] !== "completed") {
+      return
+    }
+
+    const date = new Date(columns[2])
     const month = `${date.getMonth() + 1}/${date.getFullYear()}`
-    const project = columns[60].trim()
-    const subProject = columns[61].trim()
+
+    // Extract project and subproject
+    let project, subProject
+    const projectColumn = columns[40].trim()
+
+    if (projectColumn.includes(" - ")) {
+      ;[project, subProject] = projectColumn.split(" - ").map(s => s.trim())
+    } else {
+      project = projectColumn
+      const formatColumn = columns[50].trim()
+      subProject = formatColumn.startsWith("Format=")
+        ? formatColumn.substring(7).trim()
+        : formatColumn
+    }
 
     // Skip empty projects or sub-projects
     if (!project || !subProject) {
@@ -66,11 +85,12 @@ export async function processSalesCSV(formData) {
     if (index < 5 || index > results.length - 5) {
       console.log(
         `Row ${index + 1}: Date: ${
-          columns[58]
+          columns[2]
         }, Project: ${project}, SubProject: ${subProject}`
       )
     }
 
+    // Initialize data structure
     if (!processedData[project]) {
       processedData[project] = {}
     }
@@ -84,11 +104,25 @@ export async function processSalesCSV(formData) {
       )
     }
 
+    // Map fields to their column indices
+    const fieldMapping = {
+      subtotal: 44,
+      subtotalTax: 45,
+      total: 46,
+      totalTax: 47,
+      shipping: 4,
+      shippingTax: 5,
+      feeTotal: 6,
+      feeTaxTotal: 7,
+      discount: 9,
+      refunded: 11,
+    }
+
     // Process each field
-    fields.forEach((field, idx) => {
+    Object.entries(fieldMapping).forEach(([field, columnIndex]) => {
       const value =
         parseFloat(
-          columns[fieldIndices[idx]].replace("$", "").replace(",", "").trim()
+          columns[columnIndex].replace("$", "").replace(",", "").trim()
         ) || 0
       processedData[project][subProject][month][field] += value
     })
@@ -113,7 +147,7 @@ export async function processSalesCSV(formData) {
       projectRows.push({
         Project: project,
         SubProject: "",
-        Label: "", // Added new column
+        Label: "",
         ...Object.fromEntries(months.map(m => [m, ""])),
       })
 
@@ -121,7 +155,7 @@ export async function processSalesCSV(formData) {
         projectRows.push({
           Project: "",
           SubProject: subProject,
-          Label: "", // Added new column
+          Label: "",
           ...Object.fromEntries(months.map(m => [m, ""])),
         })
 
@@ -129,9 +163,12 @@ export async function processSalesCSV(formData) {
           projectRows.push({
             Project: "",
             SubProject: "",
-            Label: field.charAt(0).toUpperCase() + field.slice(1), // Put field names in new column
+            Label: field.charAt(0).toUpperCase() + field.slice(1),
             ...Object.fromEntries(
-              months.map(m => [m, monthData[m]?.[field] || 0])
+              months.map(m => [
+                m,
+                Number(monthData[m]?.[field] || 0).toFixed(2),
+              ])
             ),
           })
         })
@@ -249,7 +286,7 @@ export async function processStreamingCSV(formData) {
           Project: "",
           Label: field.charAt(0).toUpperCase() + field.slice(1),
           ...Object.fromEntries(
-            months.map(m => [m, monthData[m]?.[field] || 0])
+            months.map(m => [m, Number(monthData[m]?.[field] || 0).toFixed(2)])
           ),
         })
       })
