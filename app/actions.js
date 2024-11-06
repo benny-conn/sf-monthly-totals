@@ -8,18 +8,6 @@ import { tmpdir } from "os"
 import { unlink } from "fs/promises"
 import { readFile } from "fs/promises"
 
-// Add at the top of the file, after imports
-const subProjectOverrides = {
-  "LP [180-g\\, numbered\\, edition of 1\\,000]":
-    "LP [180-g, numbered, edition of 1,000]",
-  "LP [180-g, numbered, edition of 500]":
-    "LP [180-g, numbered, edition of 1,000]",
-  "LP [180-g\\, numbered\\, edition of 500]":
-    "LP [180-g, numbered, edition of 1,000]",
-  "Double LP [two 180-g discs\\, numbered\\, edition of 500]":
-    "Double LP [two 180-g discs, numbered, edition of 500]",
-}
-
 // Helper function to create temporary file
 async function createTempFile(data) {
   const tempPath = join(tmpdir(), `temp-${Date.now()}.csv`)
@@ -88,8 +76,8 @@ export async function processSalesCSV(formData) {
         : formatColumn
     }
 
-    // Apply override if it exists
-    subProject = subProjectOverrides[subProject] || subProject
+    // Clean up escape characters
+    subProject = subProject.replace(/\\/g, "")
 
     // Skip empty projects or sub-projects
     if (!project || !subProject) {
