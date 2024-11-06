@@ -8,6 +8,43 @@ import { tmpdir } from "os"
 import { unlink } from "fs/promises"
 import { readFile } from "fs/promises"
 
+// Add at the top of the file after imports
+const projectMappings = {
+  "Devin Daniels": "Devin Daniels x3",
+  "Quintet Live": "Devin Daniels x3",
+  "LesGo!": "Devin Daniels x3",
+}
+
+const subProjectMappings = {
+  "Devin Daniels x3": {
+    "LP [180-g, numbered, edition of 500]":
+      "LP [180-g, numbered, edition of 1,000]",
+  },
+  "Live at Sam First": {
+    "Limited Edition 180-gram vinyl LP": "Limited Edition 180-gram vinyl LP",
+    "LP [180-g]": "Limited Edition 180-gram vinyl LP",
+  },
+
+  "Claim City": {
+    "2x Limited Edition 180-gram vinyl LP":
+      "Double LP [two 180-g discs, numbered, edition of 500]",
+    "Limited Edition 180-gram vinyl LP":
+      "Double LP [two 180-g discs, numbered, edition of 500]",
+  },
+  "World Travelers": {
+    "LP [180-g]": "Limited Edition 180-gram vinyl LP",
+    "180-Gram LP": "Limited Edition 180-gram vinyl LP",
+  },
+}
+
+// Helper function to clean text
+function cleanText(text) {
+  return text
+    .replace(/[\\\/\*\?\"\<\>\|]/g, "") // Remove problematic characters
+    .replace(/\s+/g, " ") // Normalize whitespace
+    .trim()
+}
+
 // Helper function to create temporary file
 async function createTempFile(data) {
   const tempPath = join(tmpdir(), `temp-${Date.now()}.csv`)
@@ -67,29 +104,18 @@ export async function processSalesCSV(formData) {
     const projectColumn = columns[40].trim()
 
     if (projectColumn.includes(" - ")) {
-      ;[project, subProject] = projectColumn.split(" - ").map(s => s.trim())
+      ;[project, subProject] = projectColumn.split(" - ").map(s => cleanText(s))
     } else {
-      project = projectColumn
+      project = cleanText(projectColumn)
       const formatColumn = columns[50].trim()
       subProject = formatColumn.startsWith("Format=")
-        ? formatColumn.substring(7).trim()
-        : formatColumn
+        ? cleanText(formatColumn.substring(7))
+        : cleanText(formatColumn)
     }
 
-    if (subProject === `LP [180-g\, numbered\, edition of 500]`) {
-      subProject = `LP [180-g, numbered, edition of 1,000]`
-    } else if (subProject === `LP [180-g\, numbered\, edition of 500]`) {
-      subProject = `LP [180-g, numbered, edition of 1,000]`
-    } else if (subProject === `LP [180-g\, numbered\, edition of 1\,000]`) {
-      subProject = `LP [180-g, numbered, edition of 1,000]`
-    } else if (
-      subProject === `Double LP [two 180-g discs\, numbered\, edition of 500]`
-    ) {
-      subProject = `Double LP [two 180-g discs, numbered, edition of 500]`
-    }
-    // Clean up escape characters
-    subProject = subProject.replace(/\\/g, "")
-    subProject = subProject.replace("\\", "")
+    // Apply mappings
+    project = projectMappings[project] || project
+    subProject = subProjectMappings[project]?.[subProject] || subProject
 
     // Skip empty projects or sub-projects
     if (!project || !subProject) {
