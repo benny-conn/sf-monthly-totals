@@ -76,6 +76,13 @@ export async function processSalesCSV(formData) {
         : formatColumn
     }
 
+    if (subProject === `LP [180-g\, numbered\, edition of 500]`) {
+      subProject = `LP [180-g, numbered, edition of 1,000]`
+    } else if (subProject === `LP [180-g\, numbered\, edition of 500]`) {
+      subProject = `LP [180-g, numbered, edition of 1,000]`
+    } else if (subProject === `LP [180-g\, numbered\, edition of 1\,000]`) {
+      subProject = `LP [180-g, numbered, edition of 1,000]`
+    }
     // Clean up escape characters
     subProject = subProject.replace(/\\/g, "")
 
