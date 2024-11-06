@@ -10,6 +10,7 @@ import { toast } from "sonner"
 export default function Home() {
   const [file, setFile] = useState(null)
   const [processedFileURL, setProcessedFileURL] = useState(null)
+  console.log("processedFileURL", processedFileURL)
 
   const handleFileChange = e => {
     setFile(e.target.files[0])
@@ -17,6 +18,7 @@ export default function Home() {
   }
 
   const handleSalesUpload = async () => {
+    console.log("handleSalesUpload")
     if (!file) return
 
     const formData = new FormData()
@@ -24,6 +26,7 @@ export default function Home() {
 
     try {
       const result = await processSalesCSV(formData)
+      console.log("result", result)
       setProcessedFileURL(result.downloadUrl)
     } catch (error) {
       console.error("Error processing CSV:", error)
@@ -39,6 +42,7 @@ export default function Home() {
 
     try {
       const result = await processStreamingCSV(formData)
+      console.log("result", result)
       setProcessedFileURL(result.downloadUrl)
     } catch (error) {
       console.error("Error processing CSV:", error)

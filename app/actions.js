@@ -24,8 +24,7 @@ const subProjectMappings = {
     "Limited Edition 180-gram vinyl LP": "Limited Edition 180-gram vinyl LP",
     "LP [180-g]": "Limited Edition 180-gram vinyl LP",
   },
-
-  "Claim City": {
+  "Clam City": {
     "2x Limited Edition 180-gram vinyl LP":
       "Double LP [two 180-g discs, numbered, edition of 500]",
     "Limited Edition 180-gram vinyl LP":
@@ -113,9 +112,31 @@ export async function processSalesCSV(formData) {
         : cleanText(formatColumn)
     }
 
+    console.log("before", project, subProject)
+
+    let beforeProject = project
+    let beforeSubProject = subProject
+
     // Apply mappings
-    project = projectMappings[project] || project
-    subProject = subProjectMappings[project]?.[subProject] || subProject
+    project = projectMappings[project] ?? project
+    subProject = subProjectMappings[project]?.[subProject] ?? subProject
+
+    console.log("after", project, subProject)
+
+    if (
+      projectMappings[beforeProject] ||
+      subProjectMappings[beforeProject]?.[beforeSubProject]
+    ) {
+      console.log(
+        "THERE WAS A MAPPING",
+        beforeProject,
+        "->",
+        projectMappings[beforeProject],
+        beforeSubProject,
+        "->",
+        subProjectMappings[beforeProject]?.[beforeSubProject]
+      )
+    }
 
     // Skip empty projects or sub-projects
     if (!project || !subProject) {
@@ -237,11 +258,11 @@ export async function processSalesCSV(formData) {
 
   // Upload to Vercel Blob
   const blob = await put(
-    "monthly-sales-totals.csv",
+    `monthly-sales-totals-${Date.now()}.csv`,
     await readFile(tempFilePath),
     {
       access: "public",
-      addRandomSuffix: false,
+      addRandomSuffix: true,
     }
   )
 
@@ -356,11 +377,11 @@ export async function processStreamingCSV(formData) {
 
   // Upload to Vercel Blob
   const blob = await put(
-    "streaming-monthly-totals.csv",
+    `streaming-monthly-totals-${Date.now()}.csv`,
     await readFile(tempFilePath),
     {
       access: "public",
-      addRandomSuffix: false,
+      addRandomSuffix: true,
     }
   )
 
