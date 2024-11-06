@@ -82,9 +82,14 @@ export async function processSalesCSV(formData) {
       subProject = `LP [180-g, numbered, edition of 1,000]`
     } else if (subProject === `LP [180-g\, numbered\, edition of 1\,000]`) {
       subProject = `LP [180-g, numbered, edition of 1,000]`
+    } else if (
+      subProject === `Double LP [two 180-g discs\, numbered\, edition of 500]`
+    ) {
+      subProject = `Double LP [two 180-g discs, numbered, edition of 500]`
     }
     // Clean up escape characters
     subProject = subProject.replace(/\\/g, "")
+    subProject = subProject.replace("\\", "")
 
     // Skip empty projects or sub-projects
     if (!project || !subProject) {
