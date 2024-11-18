@@ -29,19 +29,19 @@ const subProjectMappings = {
       "Double LP [two 180-g discs, numbered, edition of 500]",
     "Limited Edition 180-gram vinyl LP":
       "Double LP [two 180-g discs, numbered, edition of 500]",
-    "Digital Album Download [multiple formats]":
-      "High-res digital download FLAC or WAV",
+    "High-res digital download FLAC or WAV":
+      "Digital Album Download [multiple formats]",
   },
   "World Travelers": {
     "LP [180-g]": "Limited Edition 180-gram vinyl LP",
     "180-Gram LP": "Limited Edition 180-gram vinyl LP",
-    "Digital Album Download [multiple formats]":
-      "High-res digital download FLAC or WAV",
+    "High-res digital download FLAC or WAV":
+      "Digital Album Download [multiple formats]",
   },
   Humanoid: {
     "LP [180-g, numbered, edition of 500]": "Limited Edition 180-gram vinyl LP",
-    "Digital Album Download [multiple formats]":
-      "High-res digital download FLAC or WAV",
+    "High-res digital download FLAC or WAV":
+      "Digital Album Download [multiple formats]",
   },
 }
 
