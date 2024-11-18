@@ -40,6 +40,8 @@ const subProjectMappings = {
   },
   Humanoid: {
     "LP [180-g, numbered, edition of 500]": "Limited Edition 180-gram vinyl LP",
+    "Digital Album Download [multiple formats]":
+      "High-res digital download FLAC or WAV",
   },
 }
 
