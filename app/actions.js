@@ -65,23 +65,40 @@ async function createTempFile(data) {
 }
 
 export async function processSalesCSV(formData) {
-  const file = formData.get("file")
-  const bytes = await file.arrayBuffer()
-  const buffer = Buffer.from(bytes)
+  const salesFile = formData.get("salesFile")
+  const stripeFile = formData.get("stripeFile")
 
-  // Parse the CSV
-  const results = []
-  const parser = csv()
-  parser.on("data", data => results.push(data))
-  parser.write(buffer)
-  parser.end()
+  // Parse both files
+  const salesResults = await parseCSVBuffer(await salesFile.arrayBuffer())
+  const stripeResults = await parseCSVBuffer(await stripeFile.arrayBuffer())
 
-  // Wait for parsing to complete
-  await new Promise(resolve => parser.on("end", resolve))
+  // Process stripe data first to create a fee mapping
+  const orderFees = new Map()
 
-  console.log(`Total rows parsed: ${results.length}`)
+  stripeResults.forEach(row => {
+    const columns = Object.values(row)
+    const fee = parseFloat(columns[5]) || 0
+    const type = columns[7]
+    const description = columns[8]
 
-  // Process the data
+    if (!description) return
+
+    // Extract order number from description
+    const orderMatch = description.match(/Order\s#?(\d+)/)
+    if (!orderMatch) return
+
+    const orderId = orderMatch[1]
+
+    // Only process charges, not refunds
+    if (type.toLowerCase() === "charge") {
+      orderFees.set(orderId, {
+        fee,
+        totalAmount: parseFloat(columns[4]) || 0, // Assuming total amount is in column 4
+      })
+    }
+  })
+
+  // Process sales data with fee allocation
   const processedData = {}
   const fields = [
     "subtotal",
@@ -92,17 +109,18 @@ export async function processSalesCSV(formData) {
     "shippingTax",
     "feeTotal",
     "feeTaxTotal",
+    "stripeFee",
     "discount",
     "refunded",
   ]
 
-  results.forEach((row, index) => {
+  salesResults.forEach((row, index) => {
     const columns = Object.values(row)
+    const orderId = columns[0]
+    const orderFeeInfo = orderFees.get(orderId)
 
     // Skip non-completed orders
-    if (columns[3] !== "completed") {
-      return
-    }
+    if (columns[3] !== "completed") return
 
     const date = new Date(columns[2])
     const month = `${date.getMonth() + 1}/${date.getFullYear()}`
@@ -152,7 +170,7 @@ export async function processSalesCSV(formData) {
       return
     }
 
-    if (index < 5 || index > results.length - 5) {
+    if (index < 5 || index > salesResults.length - 5) {
       console.log(
         `Row ${index + 1}: Date: ${
           columns[2]
@@ -184,6 +202,7 @@ export async function processSalesCSV(formData) {
       shippingTax: 5,
       feeTotal: 6,
       feeTaxTotal: 7,
+      stripeFee: 8,
       discount: 9,
       refunded: 11,
     }
@@ -196,6 +215,18 @@ export async function processSalesCSV(formData) {
         ) || 0
       processedData[project][subProject][month][field] += value
     })
+
+    // Calculate and add stripe fee separately
+    let allocatedFee = 0
+    if (orderFeeInfo) {
+      const itemAmount =
+        parseFloat(columns[44].replace("$", "").replace(",", "")) || 0
+      const feeRatio = itemAmount / orderFeeInfo.totalAmount
+      allocatedFee = orderFeeInfo.fee * feeRatio
+    }
+
+    // Add the allocated fee to stripeFee instead of feeTotal
+    processedData[project][subProject][month].stripeFee += allocatedFee
   })
 
   // Prepare data for CSV writing
@@ -401,4 +432,15 @@ export async function processStreamingCSV(formData) {
 
   // Return the Blob URL
   return { downloadUrl: blob.url }
+}
+
+// Helper function to parse CSV buffer
+async function parseCSVBuffer(buffer) {
+  const results = []
+  const parser = csv()
+  parser.on("data", data => results.push(data))
+  parser.write(Buffer.from(buffer))
+  parser.end()
+
+  return new Promise(resolve => parser.on("end", () => resolve(results)))
 }

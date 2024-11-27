@@ -8,25 +8,38 @@ import { processSalesCSV, processStreamingCSV } from "./actions.js"
 import { toast } from "sonner"
 
 export default function Home() {
-  const [file, setFile] = useState(null)
+  const [salesFile, setSalesFile] = useState(null)
+  const [stripeFile, setStripeFile] = useState(null)
+  const [streamingFile, setStreamingFile] = useState(null)
   const [processedFileURL, setProcessedFileURL] = useState(null)
-  console.log("processedFileURL", processedFileURL)
 
-  const handleFileChange = e => {
-    setFile(e.target.files[0])
+  const handleSalesFileChange = e => {
+    setSalesFile(e.target.files[0])
+    setProcessedFileURL(null)
+  }
+
+  const handleStripeFileChange = e => {
+    setStripeFile(e.target.files[0])
+    setProcessedFileURL(null)
+  }
+
+  const handleStreamingFileChange = e => {
+    setStreamingFile(e.target.files[0])
     setProcessedFileURL(null)
   }
 
   const handleSalesUpload = async () => {
-    console.log("handleSalesUpload")
-    if (!file) return
+    if (!salesFile || !stripeFile) {
+      toast.error("Please upload both Sales and Stripe files")
+      return
+    }
 
     const formData = new FormData()
-    formData.append("file", file)
+    formData.append("salesFile", salesFile)
+    formData.append("stripeFile", stripeFile)
 
     try {
       const result = await processSalesCSV(formData)
-      console.log("result", result)
       setProcessedFileURL(result.downloadUrl)
     } catch (error) {
       console.error("Error processing CSV:", error)
@@ -35,14 +48,13 @@ export default function Home() {
   }
 
   const handleStreamingUpload = async () => {
-    if (!file) return
+    if (!streamingFile) return
 
     const formData = new FormData()
-    formData.append("file", file)
+    formData.append("file", streamingFile)
 
     try {
       const result = await processStreamingCSV(formData)
-      console.log("result", result)
       setProcessedFileURL(result.downloadUrl)
     } catch (error) {
       console.error("Error processing CSV:", error)
@@ -59,36 +71,57 @@ export default function Home() {
           itemized by project.
         </p>
       </div>
-      <div className="flex flex-col gap-2 items-start">
+
+      <div className="flex flex-col gap-4 items-start">
+        <h2 className="text-xl font-semibold">Sales Processing</h2>
         <div className="grid w-full max-w-sm items-center gap-1.5">
           <Label htmlFor="salesFile">Wordpress Sales CSV File</Label>
           <Input
             id="salesFile"
             type="file"
-            onChange={handleFileChange}
+            onChange={handleSalesFileChange}
             accept=".csv"
           />
         </div>
 
-        <Button size="lg" onClick={handleSalesUpload}>
-          Upload
+        <div className="grid w-full max-w-sm items-center gap-1.5">
+          <Label htmlFor="stripeFile">Stripe Payments CSV File</Label>
+          <Input
+            id="stripeFile"
+            type="file"
+            onChange={handleStripeFileChange}
+            accept=".csv"
+          />
+        </div>
+
+        <Button
+          size="lg"
+          onClick={handleSalesUpload}
+          disabled={!salesFile || !stripeFile}>
+          Upload Sales Files
         </Button>
       </div>
-      <div className="flex flex-col gap-2 items-start">
+
+      <div className="flex flex-col gap-4 items-start">
+        <h2 className="text-xl font-semibold">Streaming Processing</h2>
         <div className="grid w-full max-w-sm items-center gap-1.5">
           <Label htmlFor="streamingFile">Distrokid Streaming TSV File</Label>
           <Input
             id="streamingFile"
             type="file"
-            onChange={handleFileChange}
+            onChange={handleStreamingFileChange}
             accept=".tsv"
           />
         </div>
 
-        <Button size="lg" onClick={handleStreamingUpload}>
-          Upload
+        <Button
+          size="lg"
+          onClick={handleStreamingUpload}
+          disabled={!streamingFile}>
+          Upload Streaming File
         </Button>
       </div>
+
       {processedFileURL && (
         <Button size="lg" asChild className="max-w-96">
           <a href={processedFileURL} target="_blank" rel="noopener noreferrer">
