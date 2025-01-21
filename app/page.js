@@ -11,21 +11,21 @@ export default function Home() {
   const [salesFile, setSalesFile] = useState(null)
   const [stripeFile, setStripeFile] = useState(null)
   const [streamingFile, setStreamingFile] = useState(null)
-  const [processedFileURL, setProcessedFileURL] = useState(null)
+  const [processedFiles, setProcessedFiles] = useState(null)
 
   const handleSalesFileChange = e => {
     setSalesFile(e.target.files[0])
-    setProcessedFileURL(null)
+    setProcessedFiles(null)
   }
 
   const handleStripeFileChange = e => {
     setStripeFile(e.target.files[0])
-    setProcessedFileURL(null)
+    setProcessedFiles(null)
   }
 
   const handleStreamingFileChange = e => {
     setStreamingFile(e.target.files[0])
-    setProcessedFileURL(null)
+    setProcessedFiles(null)
   }
 
   const handleSalesUpload = async () => {
@@ -40,7 +40,7 @@ export default function Home() {
 
     try {
       const result = await processSalesCSV(formData)
-      setProcessedFileURL(result.downloadUrl)
+      setProcessedFiles(result)
     } catch (error) {
       console.error("Error processing CSV:", error)
       toast.error("Error processing CSV, contact benny!")
@@ -55,7 +55,7 @@ export default function Home() {
 
     try {
       const result = await processStreamingCSV(formData)
-      setProcessedFileURL(result.downloadUrl)
+      setProcessedFiles(result)
     } catch (error) {
       console.error("Error processing CSV:", error)
       toast.error("Error processing CSV, contact benny!")
@@ -122,12 +122,25 @@ export default function Home() {
         </Button>
       </div>
 
-      {processedFileURL && (
-        <Button size="lg" asChild className="max-w-96">
-          <a href={processedFileURL} target="_blank" rel="noopener noreferrer">
-            Download Processed CSV
-          </a>
-        </Button>
+      {processedFiles && (
+        <div className="flex flex-col gap-4">
+          <Button size="lg" asChild className="max-w-96">
+            <a
+              href={processedFiles.totalsUrl}
+              target="_blank"
+              rel="noopener noreferrer">
+              Download Monthly Totals
+            </a>
+          </Button>
+          <Button size="lg" asChild className="max-w-96">
+            <a
+              href={processedFiles.wordpressUrl}
+              target="_blank"
+              rel="noopener noreferrer">
+              Download Enhanced WordPress Report
+            </a>
+          </Button>
+        </div>
       )}
     </div>
   )

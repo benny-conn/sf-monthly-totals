@@ -77,26 +77,129 @@ export async function processSalesCSV(formData) {
 
   stripeResults.forEach(row => {
     const columns = Object.values(row)
-    const fee = parseFloat(columns[5]) || 0
     const type = columns[7]
-    const description = columns[8]
 
-    if (!description) return
+    // Try to get order ID directly first, then fall back to description
+    let orderId = columns[9]
+    if (!orderId) {
+      const description = columns[8]
+      if (description) {
+        const orderMatch = description.match(/Order\s#?(\d+)/)
+        if (orderMatch) {
+          orderId = orderMatch[1]
+        }
+      }
+    }
 
-    // Extract order number from description
-    const orderMatch = description.match(/Order\s#?(\d+)/)
-    if (!orderMatch) return
+    if (!orderId) return
 
-    const orderId = orderMatch[1]
+    const gross = parseFloat(columns[4].replace(/[$,]/g, "")) || 0
+    const fee = parseFloat(columns[5].replace(/[$,]/g, "")) || 0
+    const net = parseFloat(columns[6].replace(/[$,]/g, "")) || 0
 
     // Only process charges, not refunds
     if (type.toLowerCase() === "charge") {
+      console.log("charge", orderId, fee, gross, net)
       orderFees.set(orderId, {
         fee,
-        totalAmount: parseFloat(columns[4]) || 0, // Assuming total amount is in column 4
+        totalAmount: gross,
+        netAmount: net,
       })
     }
   })
+
+  // Create enhanced WordPress report first
+  const enhancedWordpressData = []
+  const salesByOrder = new Map()
+
+  // Group sales by order ID first
+  salesResults.forEach(row => {
+    const columns = Object.values(row)
+    const orderId = columns[0]
+    // Skip rows with no order ID
+    if (!orderId) return
+
+    if (!salesByOrder.has(orderId)) {
+      salesByOrder.set(orderId, [])
+    }
+    salesByOrder.get(orderId).push(columns)
+  })
+
+  // Process each order and its items
+  salesByOrder.forEach((orderItems, orderId) => {
+    const orderFeeInfo = orderFees.get(orderId)
+
+    // Debug log
+    console.log(`Processing order ${orderId}:`)
+
+    // Get number of items in this order
+    const itemCount = orderItems.length
+    console.log(`Items in order: ${itemCount}`)
+
+    // Each item gets an equal share
+    const itemRatio = 1 / itemCount
+
+    // Get order-level values from first item
+    const firstItemColumns = orderItems[0]
+    const orderShipping =
+      parseFloat(firstItemColumns[4].replace(/[$,]/g, "")) || 0
+    const orderTax = parseFloat(firstItemColumns[8].replace(/[$,]/g, "")) || 0
+
+    // Debug log
+    console.log(`Order shipping: ${orderShipping}, Order tax: ${orderTax}`)
+    console.log(`Each item ratio: ${itemRatio}`)
+
+    orderItems.forEach(columns => {
+      // Calculate allocated amounts - each item gets equal share
+      const allocatedStripeFee = orderFeeInfo ? orderFeeInfo.fee * itemRatio : 0
+      const allocatedStripeGross = orderFeeInfo
+        ? orderFeeInfo.totalAmount * itemRatio
+        : 0
+      const allocatedStripeNet = orderFeeInfo
+        ? orderFeeInfo.netAmount * itemRatio
+        : 0
+      const allocatedShipping = orderShipping * itemRatio
+      const allocatedTax = orderTax * itemRatio
+
+      // Debug log
+      console.log("Allocated amounts:", {
+        fee: allocatedStripeFee,
+        gross: allocatedStripeGross,
+        net: allocatedStripeNet,
+        shipping: allocatedShipping,
+        tax: allocatedTax,
+      })
+
+      // Create enhanced row with additional columns
+      enhancedWordpressData.push({
+        ...Object.fromEntries(
+          columns.map((val, i) => [Object.keys(salesResults[0])[i], val])
+        ),
+        AllocatedStripeFee: allocatedStripeFee.toFixed(2),
+        AllocatedStripeGross: allocatedStripeGross.toFixed(2),
+        AllocatedStripeNet: allocatedStripeNet.toFixed(2),
+        AllocatedShipping: allocatedShipping.toFixed(2),
+        AllocatedTax: allocatedTax.toFixed(2),
+        ItemRatio: itemRatio.toFixed(4),
+      })
+    })
+  })
+
+  // Create enhanced WordPress CSV
+  const wordpressHeaders = [
+    ...Object.keys(salesResults[0]),
+    "AllocatedStripeFee",
+    "AllocatedStripeGross",
+    "AllocatedStripeNet",
+    "AllocatedShipping",
+    "AllocatedTax",
+    "ItemRatio",
+  ]
+
+  const enhancedWordpressCSV = {
+    header: wordpressHeaders.map(h => ({ id: h, title: h })),
+    records: enhancedWordpressData,
+  }
 
   // Process sales data with fee allocation
   const processedData = {}
@@ -106,7 +209,6 @@ export async function processSalesCSV(formData) {
     "total",
     "totalTax",
     "shipping",
-    "shippingTax",
     "feeTotal",
     "feeTaxTotal",
     "stripeFee",
@@ -139,7 +241,7 @@ export async function processSalesCSV(formData) {
         : cleanText(formatColumn)
     }
 
-    console.log("before", project, subProject)
+    // console.log("before", project, subProject)
 
     let beforeProject = project
     let beforeSubProject = subProject
@@ -148,35 +250,35 @@ export async function processSalesCSV(formData) {
     project = projectMappings[project] ?? project
     subProject = subProjectMappings[project]?.[subProject] ?? subProject
 
-    console.log("after", project, subProject)
+    // console.log("after", project, subProject)
 
-    if (
-      projectMappings[beforeProject] ||
-      subProjectMappings[beforeProject]?.[beforeSubProject]
-    ) {
-      console.log(
-        "THERE WAS A MAPPING",
-        beforeProject,
-        "->",
-        projectMappings[beforeProject],
-        beforeSubProject,
-        "->",
-        subProjectMappings[beforeProject]?.[beforeSubProject]
-      )
-    }
+    // if (
+    //   projectMappings[beforeProject] ||
+    //   subProjectMappings[beforeProject]?.[beforeSubProject]
+    // ) {
+    //   console.log(
+    //     "THERE WAS A MAPPING",
+    //     beforeProject,
+    //     "->",
+    //     projectMappings[beforeProject],
+    //     beforeSubProject,
+    //     "->",
+    //     subProjectMappings[beforeProject]?.[beforeSubProject]
+    //   )
+    // }
 
     // Skip empty projects or sub-projects
     if (!project || !subProject) {
       return
     }
 
-    if (index < 5 || index > salesResults.length - 5) {
-      console.log(
-        `Row ${index + 1}: Date: ${
-          columns[2]
-        }, Project: ${project}, SubProject: ${subProject}`
-      )
-    }
+    // if (index < 5 || index > salesResults.length - 5) {
+    //   console.log(
+    //     `Row ${index + 1}: Date: ${
+    //       columns[2]
+    //     }, Project: ${project}, SubProject: ${subProject}`
+    //   )
+    // }
 
     // Initialize data structure
     if (!processedData[project]) {
@@ -199,7 +301,6 @@ export async function processSalesCSV(formData) {
       total: 46,
       totalTax: 47,
       shipping: 4,
-      shippingTax: 5,
       feeTotal: 6,
       feeTaxTotal: 7,
       stripeFee: 8,
@@ -213,19 +314,34 @@ export async function processSalesCSV(formData) {
         parseFloat(
           columns[columnIndex].replace("$", "").replace(",", "").trim()
         ) || 0
-      processedData[project][subProject][month][field] += value
+
+      // Make fee-related fields and stripe fee negative
+      const adjustedValue =
+        field === "feeTotal" || field === "feeTaxTotal" || field === "stripeFee"
+          ? -Math.abs(value)
+          : value
+
+      // Add shipping tax to total tax
+      if (field === "totalTax") {
+        const shippingTax =
+          parseFloat(columns[5].replace("$", "").replace(",", "").trim()) || 0
+        processedData[project][subProject][month][field] +=
+          adjustedValue + shippingTax
+      } else {
+        processedData[project][subProject][month][field] += adjustedValue
+      }
     })
 
-    // Calculate and add stripe fee separately
+    // Calculate and add stripe fee separately (as negative)
     let allocatedFee = 0
     if (orderFeeInfo) {
       const itemAmount =
         parseFloat(columns[44].replace("$", "").replace(",", "")) || 0
       const feeRatio = itemAmount / orderFeeInfo.totalAmount
-      allocatedFee = orderFeeInfo.fee * feeRatio
+      allocatedFee = -Math.abs(orderFeeInfo.fee * feeRatio) // Make negative
     }
 
-    // Add the allocated fee to stripeFee instead of feeTotal
+    // Add the allocated fee to stripeFee
     processedData[project][subProject][month].stripeFee += allocatedFee
   })
 
@@ -240,7 +356,7 @@ export async function processSalesCSV(formData) {
     return new Date(aYear, aMonth - 1) - new Date(bYear, bMonth - 1)
   })
 
-  console.log("Sorted Months:", months)
+  //   console.log("Sorted Months:", months)
 
   const outputData = Object.entries(processedData).flatMap(
     ([project, subProjects]) => {
@@ -279,8 +395,8 @@ export async function processSalesCSV(formData) {
     }
   )
 
-  console.log("First 5 rows of output data:")
-  console.log(JSON.stringify(outputData.slice(0, 5), null, 2))
+  //   console.log("First 5 rows of output data:")
+  //   console.log(JSON.stringify(outputData.slice(0, 5), null, 2))
 
   // Prepare the CSV data
   const csvData = {
@@ -293,26 +409,38 @@ export async function processSalesCSV(formData) {
     records: outputData,
   }
 
-  // Create temporary file
-  const tempFilePath = await createTempFile(csvData)
+  // Create temporary files
+  const totalsFilePath = await createTempFile(csvData)
+  const wordpressFilePath = await createTempFile(enhancedWordpressCSV)
 
-  // Upload to Vercel Blob
-  const blob = await put(
+  // Upload both files to Vercel Blob
+  const totalsBlob = await put(
     `monthly-sales-totals-${Date.now()}.csv`,
-    await readFile(tempFilePath),
+    await readFile(totalsFilePath),
     {
       access: "public",
       addRandomSuffix: true,
     }
   )
 
-  // Clean up temp file
-  await unlink(tempFilePath)
+  const wordpressBlob = await put(
+    `enhanced-wordpress-${Date.now()}.csv`,
+    await readFile(wordpressFilePath),
+    {
+      access: "public",
+      addRandomSuffix: true,
+    }
+  )
 
-  console.log(`File uploaded to ${blob.url}`)
+  // Clean up temp files
+  await unlink(totalsFilePath)
+  await unlink(wordpressFilePath)
 
-  // Return the Blob URL
-  return { downloadUrl: blob.url }
+  // Return both URLs
+  return {
+    totalsUrl: totalsBlob.url,
+    wordpressUrl: wordpressBlob.url,
+  }
 }
 
 export async function processStreamingCSV(formData) {
