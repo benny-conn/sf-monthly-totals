@@ -175,7 +175,7 @@ export async function processSalesCSV(formData) {
         ...Object.fromEntries(
           columns.map((val, i) => [Object.keys(salesResults[0])[i], val])
         ),
-        AllocatedStripeFee: allocatedStripeFee.toFixed(2),
+        AllocatedStripeFee: (-Math.abs(allocatedStripeFee)).toFixed(2),
         AllocatedStripeGross: allocatedStripeGross.toFixed(2),
         AllocatedStripeNet: allocatedStripeNet.toFixed(2),
         AllocatedShipping: allocatedShipping.toFixed(2),
